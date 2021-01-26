@@ -237,3 +237,5 @@ coverage.xml
 coverage/.
 .vscode
 conf/config.js
+
+data/mysql
