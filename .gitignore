@@ -238,4 +238,6 @@ coverage/.
 .vscode
 conf/config.js
 
-data/mysql
+data/**
+node_modules
+docker-compose.conf
