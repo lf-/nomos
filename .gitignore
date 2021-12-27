@@ -5,7 +5,6 @@ backup
 *.zip
 logs/*.log
 
-
 #################
 ## Eclipse
 #################
@@ -36,7 +35,6 @@ local.properties
 
 # PDT-specific
 .buildpath
-
 
 #################
 ## Visual Studio
@@ -191,7 +189,6 @@ $RECYCLE.BIN/
 # Mac crap
 .DS_Store
 
-
 #############
 ## Python
 #############
@@ -235,9 +232,10 @@ docker/nomos.env
 #Coverage
 coverage.xml
 coverage/.
-.vscode
-conf/config.js
 
 data/**
 node_modules
 docker-compose.conf
+
+.vscode
+conf/config.js
