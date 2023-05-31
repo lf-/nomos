@@ -11,7 +11,6 @@ namespace vhs\database\wheres;
 use vhs\database\Column;
 use vhs\database\Element;
 use vhs\database\IGenerator;
-use vhs\database\queries\Query;
 
 abstract class Where extends Element {
 

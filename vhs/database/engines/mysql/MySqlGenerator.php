@@ -25,7 +25,6 @@ use vhs\database\orders\OrderBy;
 use vhs\database\orders\OrderByAscending;
 use vhs\database\orders\OrderByDescending;
 use vhs\database\queries\IQueryGenerator;
-use vhs\database\queries\Query;
 use vhs\database\queries\QueryDelete;
 use vhs\database\queries\QueryInsert;
 use vhs\database\queries\QuerySelect;
@@ -50,6 +49,8 @@ use vhs\database\limits\Limit;
 use vhs\database\offsets\IOffsetGenerator;
 use vhs\database\offsets\Offset;
 use vhs\database\wheres\WhereOr;
+use vhs\database\engines\mysql\MySqlSegment;
+use function vhs\database\engines\mysql\segs;
 
 class MySqlGenerator implements
     IWhereGenerator,
@@ -78,32 +79,23 @@ class MySqlGenerator implements
         $this->conn = $conn;
     }
 
-    public function generateAnd(WhereAnd $where) {
-        $sql = "(";
+    private function generateInterspersedWheres(Where $where, string $op): MySqlSegment {
+        $joined = array_reduce($where->wheres, function ($segment, $w) use($op) {
+            if ($segment != MySqlSegment::empty()) {
+                $segment = $segment->plus(" $op ");
+            }
+            return segs($segment, "(", $w->generate($this), ")");
+        }, MySqlSegment::empty());
 
-        foreach($where->wheres as $w)
-            /** @var Where $w */
-            $sql .= "(" . $w->generate($this) . ") AND ";
-
-        $sql = substr($sql, 0, -5);
-
-        $sql .= ")";
-
-        return $sql;
+        return segs("(", $joined, ")");
     }
 
-    public function generateOr(WhereOr $where) {
-        $sql = "(";
+    public function generateAnd(WhereAnd $where): MySqlSegment {
+        return $this->generateInterspersedWheres($where, 'AND');
+    }
 
-        foreach($where->wheres as $w)
-            /** @var Where $w */
-            $sql .= "(" . $w->generate($this) . ") OR ";
-
-        $sql = substr($sql, 0, -4);
-
-        $sql .= ")";
-
-        return $sql;
+    public function generateOr(WhereOr $where): MySqlSegment {
+        return $this->generateInterspersedWheres($where, 'OR');
     }
 
     public function generateComparator(WhereComparator $where) {
