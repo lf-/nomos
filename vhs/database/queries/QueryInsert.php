@@ -15,7 +15,7 @@ use vhs\database\wheres\Where;
 
 class QueryInsert extends Query {
 
-    public $columns;
+    public Columns $columns;
     public $values;
 
     public function __construct(Table $table, Columns $columns, array $values) {

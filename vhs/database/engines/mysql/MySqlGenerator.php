@@ -8,6 +8,12 @@
 
 namespace vhs\database\engines\mysql;
 
+// XXX: required due to use of free functions of MySqlSegment.php prior to
+// using a MySqlSegment instance. MySqlSegment is not expected to be used
+// without this file anyway.
+require_once __DIR__ . '/MySqlSegment.php';
+
+use mysqli;
 use vhs\database\Column;
 use vhs\database\exceptions\DatabaseException;
 use vhs\database\IColumnGenerator;
@@ -80,14 +86,12 @@ class MySqlGenerator implements
     }
 
     private function generateInterspersedWheres(Where $where, string $op): MySqlSegment {
-        $joined = array_reduce($where->wheres, function ($segment, $w) use($op) {
-            if ($segment != MySqlSegment::empty()) {
-                $segment = $segment->plus(" $op ");
-            }
-            return segs($segment, "(", $w->generate($this), ")");
-        }, MySqlSegment::empty());
+        $wheres = array_map(
+            function ($v) { return segs('(', $v->generate($this), ')'); },
+            $where->wheres
+        );
 
-        return segs("(", $joined, ")");
+        return segs("(", MySqlSegment::interspersedWith(" $op ", ...$wheres), ")");
     }
 
     public function generateAnd(WhereAnd $where): MySqlSegment {
@@ -99,6 +103,7 @@ class MySqlGenerator implements
     }
 
     public function generateComparator(WhereComparator $where) {
+        // FIXME(jade): should change to instanceof
         if ($where->isArray || (is_object($where->value) && get_class($where->value) == "vhs\\database\\queries\\QuerySelect")) {
             $sql = $where->column->generate($this);
 
@@ -157,17 +162,15 @@ class MySqlGenerator implements
     public function generateDescending(OrderByDescending $descending) {
         return $this->gen($descending, "DESC");
     }
-
+    /**
+     * @param mixed $type
+     */
     private function gen(OrderBy $orderBy, $type) {
-        $clause = $orderBy->column->generate($this) . " {$type}, ";
+        $clause = segs($orderBy->column->generate($this), " {$type}, ");
 
-        foreach($orderBy->orderBy as $n)
-            /** @var OrderBy $n */
-            $clause .= $n->generate($this) . ", ";
+        $pieces = MySqlSegment::interspersedWith(", ", ...array_map(function ($n) { return $n->generate($this); }, $orderBy->orderBy));
 
-        $clause = substr($clause, 0, -2);
-
-        return $clause;
+        return segs($clause, $pieces);
     }
 
     public function generateLimit(Limit $limit) {
@@ -186,70 +189,52 @@ class MySqlGenerator implements
         return $clause;
     }
 
-    public function generateSelect(QuerySelect $query)
+    /**
+     * @param QuerySelect|QueryCount $query
+     */
+    private function generateSelectWith($query, string $selector): MySqlSegment
+    {
+        $clause = (!is_null($query->where)) ? segs($query->where->generate($this)) : MySqlSegment::empty();
+        $orderClause = (!is_null($query->orderBy)) ? segs($query->orderBy->generate($this)) : MySqlSegment::empty();
+        $limit = (!is_null($query->limit)) ? segs($query->limit->generate($this)) : MySqlSegment::empty();
+        $offset = (!is_null($query->offset)) ? segs($query->offset->generate($this)) : MySqlSegment::empty();
+
+        $sql = seg("SELECT {$selector} FROM `{$query->table->name}` AS {$query->table->alias}");
+
+        if(!is_null($query->joins)) {
+            /** @var Join $join */
+            foreach($query->joins as $join) {
+                $sql = segs($sql, " ", $join->generate($this));
+            }
+        }
+
+        if(!$clause->isEmpty())
+            $sql = segs($sql, " WHERE ", $clause);
+
+        if(!$orderClause->isEmpty())
+            $sql = segs($sql, " ORDER BY ", $orderClause);
+
+        if(!empty($limit))
+            $sql = segs($sql, " ", $limit);
+
+        if(!empty($offset))
+            $sql = segs($sql, " ", $offset);
+
+        return $sql;
+    }
+
+    public function generateSelect(QuerySelect $query): MySqlSegment
     {
         $selector = implode(", ", array_map(function(Column $column) { return $column->generate($this); }, $query->columns->all()));
-        $clause = (!is_null($query->where)) ? $query->where->generate($this) : "";
-        $orderClause = (!is_null($query->orderBy)) ? $query->orderBy->generate($this) : "";
-        $limit = (!is_null($query->limit)) ? $query->limit->generate($this) : "";
-        $offset = (!is_null($query->offset)) ? $query->offset->generate($this) : "";
-
-        $sql = "SELECT {$selector} FROM `{$query->table->name}` AS {$query->table->alias}";
-
-        if(!is_null($query->joins)) {
-            /** @var Join $join */
-            foreach($query->joins as $join) {
-                $sql .= " " . $join->generate($this);
-            }
-        }
-
-        if(!empty($clause))
-            $sql .= " WHERE {$clause}";
-
-        if(!empty($orderClause))
-            $sql .= " ORDER BY {$orderClause}";
-
-        if(!empty($limit))
-            $sql .= " {$limit}";
-
-        if(!empty($offset))
-            $sql .= " {$offset}";
-
-        return $sql;
+        return $this->generateSelectWith($query, $selector);
     }
 
-    public function generateSelectCount(QueryCount $query)
+    public function generateSelectCount(QueryCount $query): MySqlSegment
     {
-        $clause = (!is_null($query->where)) ? $query->where->generate($this) : "";
-        $orderClause = (!is_null($query->orderBy)) ? $query->orderBy->generate($this) : "";
-        $limit = (!is_null($query->limit)) ? $query->limit->generate($this) : "";
-        $offset = (!is_null($query->offset)) ? $query->offset->generate($this) : "";
-
-        $sql = "SELECT COUNT(*) FROM `{$query->table->name}` AS {$query->table->alias}";
-
-        if(!is_null($query->joins)) {
-            /** @var Join $join */
-            foreach($query->joins as $join) {
-                $sql .= " " . $join->generate($this);
-            }
-        }
-
-        if(!empty($clause))
-            $sql .= " WHERE {$clause}";
-
-        if(!empty($orderClause))
-            $sql .= " ORDER BY {$orderClause}";
-
-        if(!empty($limit))
-            $sql .= " {$limit}";
-
-        if(!empty($offset))
-            $sql .= " {$offset}";
-
-        return $sql;
+        return $this->generateSelectWith($query, 'COUNT(*)');
     }
 
-    public function generateInsert(QueryInsert $query)
+    public function generateInsert(QueryInsert $query): MySqlSegment
     {
         $columns = array();
         $values = array();
@@ -261,9 +246,9 @@ class MySqlGenerator implements
         }
 
         $columns = implode(", ", $columns);
-        $values = implode(", ", $values);
+        $values = MySqlSegment::interspersedWith(", ", ...$values);
 
-        $sql = "INSERT INTO `{$query->table->name}` ({$columns}) VALUES ({$values})";
+        $sql = segs("INSERT INTO `{$query->table->name}` ({$columns}) VALUES (", $values, ")");
 
         return $sql;
     }
@@ -302,7 +287,10 @@ class MySqlGenerator implements
 
         return $sql;
     }
-
+    /**
+     * @param callable(): mixed $gen
+     * @param mixed $value
+     */
     private function genVal(callable $gen, Type $type, $value = null) {
         if (is_null($value)) {
             if ($type->nullable) return "NULL";

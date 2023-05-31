@@ -15,6 +15,7 @@ use vhs\database\wheres\Where;
 use vhs\domain\Schema;
 use vhs\Logger;
 use vhs\loggers\ConsoleLogger;
+use function vhs\database\engines\mysql\seg;
 
 class TestSchema extends Schema {
     /**
@@ -240,7 +241,7 @@ class WhereTests extends TestCase {
 
         $clause = $where->generate($this->mySqlGenerator);
         self::$logger->log($clause);
-        $this->assertEquals("((tst0.`test1` = 'test2') AND (tst0.`test3` = 'test4'))", $clause);
+        $this->assertEquals(seg("((tst0.`test1` = 'test2') AND (tst0.`test3` = 'test4'))"), $clause);
 
         /** @var callable $clause */
         $clause = $where->generate($this->inMemoryGenerator);
@@ -264,7 +265,7 @@ class WhereTests extends TestCase {
 
         $clause = $where->generate($this->mySqlGenerator);
         self::$logger->log($clause);
-        $this->assertEquals("((tst0.`test1` = 'test2') OR (tst0.`test3` = 'test4'))", $clause);
+        $this->assertEquals(seg("((tst0.`test1` = 'test2') OR (tst0.`test3` = 'test4'))"), $clause);
 
         /** @var callable $clause */
         $clause = $where->generate($this->inMemoryGenerator);
@@ -300,7 +301,7 @@ class WhereTests extends TestCase {
 
         $clause = $where->generate($this->mySqlGenerator);
         self::$logger->log($clause);
-        $this->assertEquals("((tst0.`test1` = 'test2') AND (((tst0.`test3` = 'test4') OR (tst0.`test5` = 'test6'))))", $clause);
+        $this->assertEquals(seg("((tst0.`test1` = 'test2') AND (((tst0.`test3` = 'test4') OR (tst0.`test5` = 'test6'))))"), $clause);
 
         /** @var callable $clause */
         $clause = $where->generate($this->inMemoryGenerator);

@@ -31,7 +31,10 @@ final class MySqlSegment
             }
         }
     }
+
     /**
+     * Adds this to another MySqlSegment to create a new one.
+     *
      * @param string|MySqlSegment $other
      */
     public function plus($other): MySqlSegment
@@ -42,8 +45,7 @@ final class MySqlSegment
             return new self($this->sql . $other, ...$this->params);
         } else {
             $otherType = gettype($other);
-            throw new \TypeError("Wrong type $otherType passed to MySqlSegment::plus, \
-                expected string or MySqlSegment");
+            throw new \TypeError("Wrong type $otherType passed to MySqlSegment::plus, expected string or MySqlSegment");
         }
     }
 
@@ -52,6 +54,28 @@ final class MySqlSegment
         $asString = var_export($this->sql, true);
         $paramsList = implode(', ', array_map(function ($v) { var_export($v, true); }, $this->params));
         return "$asString [$paramsList]";
+    }
+
+    public function isEmpty(): bool {
+        return $this == self::empty();
+    }
+
+    /**
+     * Intersperses a list of MySqlSegments with a separator. Useful for
+     * generating all manner of things.
+     *
+     * @param string|MySqlSegment $separator
+     * @param string|MySqlSegment[] $list
+     */
+    public static function interspersedWith($separator, ...$list): MySqlSegment {
+        return array_reduce($list, function ($acc, $val) use($separator) {
+            if (is_null($acc)) {
+                $acc = MySqlSegment::empty();
+            } else {
+                $acc = $acc->plus($separator);
+            }
+            return $acc->plus($val);
+        }, null);
     }
 
     public static function empty(): MySqlSegment

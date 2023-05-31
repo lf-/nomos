@@ -82,7 +82,7 @@ class Columns {
         return false;
     }
 
-    public function getByName($name) {
+    public function getByName(string $name): ?Column {
         foreach($this->__columns as $col)
             if ($col->name == $name)
                 return $col;

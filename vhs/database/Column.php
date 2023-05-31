@@ -15,7 +15,7 @@ class Column extends Element implements \Serializable, \JsonSerializable {
 
     public $table;
     public $name;
-    public $type;
+    public Type $type;
     public $serializable;
 
     public function __construct(Table &$table, $name, Type $type, $serializable = true) {
